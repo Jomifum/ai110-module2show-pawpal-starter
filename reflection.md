@@ -4,14 +4,17 @@
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
+I used four classes: Owner, Pet, Task, and Scheduler, plus a TaskType enum (feeding/walk/medication/appointment).
+
+Owner and Pet are data-holding classes (implemented as dataclasses) that map to action 1 — registering pet and owner info. Owner also holds available_minutes_per_day, since action 3 needs a time budget to plan against.
+Task is a dataclass representing one unit of care work — it holds duration_minutes and priority (1–5), which are exactly the two fields action 2 asked for.
+Scheduler holds all the algorithmic behavior instead of Task or Owner, so the logic for sorting, conflict detection, and — most importantly — generate_daily_plan() lives in one testable place. I split this out specifically because action 3 isn't a simple sort; it's a constrained-selection problem (fit the highest-priority tasks into a limited time budget), which is different enough from "sort by priority" that it earns its own method.
+
 - What classes did you include, and what responsibilities did you assign to each?
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
-
+Initially I scaffolded a generic get_today_tasks() method, but re-reading my own action 3, I realized that's not enough — it just filters by date, it doesn't optimize anything. I added a separate generate_daily_plan() method to Scheduler and an available_minutes_per_day field to Owner so there's an actual time budget to plan against.
 ---
 
 ## 2. Scheduling Logic and Tradeoffs

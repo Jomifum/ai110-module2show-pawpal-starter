@@ -1,0 +1,65 @@
+classDiagram
+    class Owner {
+        +str owner_id
+        +str name
+        +str email
+        +str phone
+        +int available_minutes_per_day
+        +List~Pet~ pets
+        +add_pet(pet: Pet) None
+        +remove_pet(pet_id: str) bool
+        +get_pet(pet_id: str) Pet
+    }
+
+    class Pet {
+        +str pet_id
+        +str name
+        +str species
+        +str breed
+        +int age
+        +float weight
+        +str owner_id
+        +str medical_notes
+    }
+
+    class Task {
+        +str task_id
+        +str pet_id
+        +TaskType task_type
+        +datetime scheduled_time
+        +int duration_minutes
+        +int priority
+        +bool is_recurring
+        +str recurrence_pattern
+        +bool completed
+        +str notes
+        +mark_complete() None
+        +is_overdue(reference_time) bool
+    }
+    note for Task "priority is 1 (low) to 5 (critical)"
+
+    class TaskType {
+        <<enumeration>>
+        FEEDING
+        WALK
+        MEDICATION
+        APPOINTMENT
+    }
+
+    class Scheduler {
+        +List~Task~ tasks
+        +add_task(task: Task) None
+        +remove_task(task_id: str) bool
+        +get_tasks_for_pet(pet_id: str) List~Task~
+        +get_today_tasks(reference_date) List~Task~
+        +sort_by_time() List~Task~
+        +detect_conflicts() List~tuple~
+        +get_overdue_tasks(reference_time) List~Task~
+        +generate_daily_plan(pet_ids, available_minutes, reference_date) List~Task~
+        +generate_recurring_instances(task, horizon_days) List~Task~
+    }
+
+    Owner "1" --> "0..*" Pet : owns
+    Pet "1" --> "0..*" Task : has
+    Scheduler "1" --> "0..*" Task : manages
+    Task ..> TaskType : uses
