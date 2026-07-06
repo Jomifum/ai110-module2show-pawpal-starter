@@ -122,23 +122,32 @@ class Scheduler:
         target_date = reference_date.date()
         return [task for task in self.tasks if task.scheduled_time.date() == target_date]
 
+    def filter_tasks(self, pet_id: str = None, completed: bool = None) -> List[Task]:
+        """Return tasks filtered by pet and/or completion status."""
+        return [
+            task
+            for task in self.tasks
+            if (pet_id is None or task.pet_id == pet_id)
+            and (completed is None or task.completed is completed)
+        ]
+
     def sort_by_time(self) -> List[Task]:
         """Return all tasks sorted chronologically by scheduled_time."""
         return sorted(self.tasks, key=lambda task: task.scheduled_time)
 
-    def detect_conflicts(self) -> List[Tuple[Task, Task]]:
-        """Return overlapping task pairs for the same pet."""
-        conflicts: List[Tuple[Task, Task]] = []
+    def detect_conflicts(self) -> List[Tuple[Task, Task, str]]:
+        """Return overlapping task pairs with a conflict type label."""
+        conflicts: List[Tuple[Task, Task, str]] = []
         for index, first_task in enumerate(self.tasks):
             for second_task in self.tasks[index + 1 :]:
-                if first_task.pet_id != second_task.pet_id:
-                    continue
-
                 first_end = first_task.scheduled_time + timedelta(minutes=first_task.duration_minutes)
                 second_end = second_task.scheduled_time + timedelta(minutes=second_task.duration_minutes)
 
                 if first_task.scheduled_time < second_end and second_task.scheduled_time < first_end:
-                    conflicts.append((first_task, second_task))
+                    if first_task.pet_id == second_task.pet_id:
+                        conflicts.append((first_task, second_task, "same_pet"))
+                    else:
+                        conflicts.append((first_task, second_task, "owner_double_booked"))
         return conflicts
 
     def get_overdue_tasks(self, reference_time: Optional[datetime] = None) -> List[Task]:
@@ -184,6 +193,33 @@ class Scheduler:
                 total_duration += task.duration_minutes
 
         return selected_tasks
+
+    def complete_task(self, task_id: str) -> Optional[Task]:
+        """Mark a task complete and create the next recurring instance if needed."""
+        task = next((existing_task for existing_task in self.tasks if existing_task.task_id == task_id), None)
+        if task is None:
+            return None
+
+        task.mark_complete()
+
+        if not task.is_recurring or task.recurrence_pattern not in {"daily", "weekly"}:
+            return None
+
+        step_days = 1 if task.recurrence_pattern == "daily" else 7
+        next_task = Task(
+            task_id=f"{task.task_id}_next",
+            pet_id=task.pet_id,
+            task_type=task.task_type,
+            scheduled_time=task.scheduled_time + timedelta(days=step_days),
+            duration_minutes=task.duration_minutes,
+            priority=task.priority,
+            is_recurring=task.is_recurring,
+            recurrence_pattern=task.recurrence_pattern,
+            completed=False,
+            notes=task.notes,
+        )
+        self.add_task(next_task)
+        return next_task
 
     def generate_recurring_instances(self, task: Task, horizon_days: int) -> List[Task]:
         """Generate future instances of a recurring task up to the given horizon."""

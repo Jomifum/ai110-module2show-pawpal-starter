@@ -1,4 +1,14 @@
+from datetime import datetime
+
 import streamlit as st
+
+from pawpal_system import Owner, Pet, Scheduler, Task, TaskType
+
+if "scheduler" not in st.session_state:
+    st.session_state.scheduler = Scheduler()
+
+if "owner" not in st.session_state:
+    st.session_state.owner = None
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
@@ -40,33 +50,133 @@ st.divider()
 
 st.subheader("Quick Demo Inputs (UI only)")
 owner_name = st.text_input("Owner name", value="Jordan")
-pet_name = st.text_input("Pet name", value="Mochi")
-species = st.selectbox("Species", ["dog", "cat", "other"])
+available_minutes = st.number_input("Available minutes per day", min_value=1, max_value=1440, value=90)
 
-st.markdown("### Tasks")
-st.caption("Add a few tasks. In your final version, these should feed into your scheduler.")
-
-if "tasks" not in st.session_state:
-    st.session_state.tasks = []
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    task_title = st.text_input("Task title", value="Morning walk")
-with col2:
-    duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
-with col3:
-    priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
-
-if st.button("Add task"):
-    st.session_state.tasks.append(
-        {"title": task_title, "duration_minutes": int(duration), "priority": priority}
-    )
-
-if st.session_state.tasks:
-    st.write("Current tasks:")
-    st.table(st.session_state.tasks)
+if st.session_state.owner is not None:
+    owner = st.session_state.owner
+    st.success(f"Owner ready: {owner.name} ({owner.available_minutes_per_day} min/day)")
 else:
-    st.info("No tasks yet. Add one above.")
+    if st.button("Create Owner"):
+        if owner_name.strip():
+            owner_id = f"owner-{len(st.session_state.scheduler.tasks) + 1}"
+            st.session_state.owner = Owner(
+                owner_id=owner_id,
+                name=owner_name.strip(),
+                email="placeholder@example.com",
+                available_minutes_per_day=int(available_minutes),
+            )
+            st.rerun()
+        else:
+            st.warning("Please enter an owner name first.")
+
+if st.session_state.owner is not None:
+    with st.form("add_pet_form"):
+        st.subheader("Add a Pet")
+        pet_name = st.text_input("Pet name", value="Mochi")
+        species = st.selectbox("Species", ["dog", "cat", "other"])
+        breed = st.text_input("Breed", value="")
+        age = st.number_input("Age", min_value=0, max_value=50, value=0)
+        weight = st.number_input("Weight", min_value=0.0, max_value=200.0, value=0.0)
+
+        submitted = st.form_submit_button("Add Pet")
+        if submitted:
+            if pet_name.strip():
+                pet_id = f"pet-{len(st.session_state.owner.pets) + 1}"
+                pet = Pet(
+                    pet_id=pet_id,
+                    name=pet_name.strip(),
+                    species=species,
+                    owner_id=st.session_state.owner.owner_id,
+                    breed=breed.strip(),
+                    age=int(age),
+                    weight=float(weight),
+                )
+                st.session_state.owner.add_pet(pet)
+                st.success(f"Added {pet.name} to {st.session_state.owner.name}'s account.")
+                st.rerun()
+            else:
+                st.warning("Please enter a pet name first.")
+
+    if st.session_state.owner.pets:
+        st.write("Current pets:")
+        for pet in st.session_state.owner.pets:
+            st.write(f"- {pet.name} ({pet.species})")
+
+    if st.session_state.owner.pets:
+        with st.form("schedule_task_form"):
+            st.subheader("Schedule a Task")
+            pet_options = [(pet.name, pet.pet_id) for pet in st.session_state.owner.pets]
+            selected_pet_name = st.selectbox("Pet", options=[name for name, _ in pet_options])
+            selected_pet_id = next(pet_id for name, pet_id in pet_options if name == selected_pet_name)
+
+            task_type = st.selectbox("Task Type", options=[task_type.value for task_type in TaskType])
+            scheduled_time = st.time_input("Scheduled Time")
+            duration_minutes = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
+            priority = st.slider("Priority", min_value=1, max_value=5, value=3)
+
+            submitted = st.form_submit_button("Add Task")
+            if submitted:
+                task_id = f"task-{len(st.session_state.scheduler.tasks) + 1}"
+                task = Task(
+                    task_id=task_id,
+                    pet_id=selected_pet_id,
+                    task_type=TaskType(task_type),
+                    scheduled_time=datetime.combine(datetime.today().date(), scheduled_time),
+                    duration_minutes=int(duration_minutes),
+                    priority=int(priority),
+                )
+                st.session_state.scheduler.add_task(task)
+                st.success(f"Added {task.task_type.value} task for {selected_pet_name}.")
+                st.rerun()
+
+    if st.session_state.owner is not None and st.session_state.owner.pets:
+        st.subheader("Today's Schedule")
+        sorted_tasks = st.session_state.scheduler.sort_by_time()
+        if sorted_tasks:
+            schedule_rows = []
+            for task in sorted_tasks:
+                pet = st.session_state.owner.get_pet(task.pet_id)
+                pet_name = pet.name if pet else task.pet_id
+                schedule_rows.append(
+                    {
+                        "pet_name": pet_name,
+                        "task_type": task.task_type.value,
+                        "time": task.scheduled_time.strftime("%H:%M"),
+                        "duration": task.duration_minutes,
+                        "priority": task.priority,
+                    }
+                )
+            st.table(schedule_rows)
+        else:
+            st.info("No tasks scheduled yet.")
+
+        st.subheader("Optimized Daily Plan")
+        daily_plan = st.session_state.scheduler.generate_daily_plan(
+            available_minutes=st.session_state.owner.available_minutes_per_day
+        )
+        if daily_plan:
+            daily_plan_rows = []
+            for task in daily_plan:
+                pet = st.session_state.owner.get_pet(task.pet_id)
+                pet_name = pet.name if pet else task.pet_id
+                daily_plan_rows.append(
+                    {
+                        "pet_name": pet_name,
+                        "task_type": task.task_type.value,
+                        "time": task.scheduled_time.strftime("%H:%M"),
+                        "duration": task.duration_minutes,
+                        "priority": task.priority,
+                    }
+                )
+            st.table(daily_plan_rows)
+        else:
+            st.info("No tasks fit the current daily budget.")
+
+        conflicts = st.session_state.scheduler.detect_conflicts()
+        if conflicts:
+            st.warning("Conflicts detected:")
+            for first, second in conflicts:
+                st.warning(f"- {first.task_id} and {second.task_id} overlap")
 
 st.divider()
 

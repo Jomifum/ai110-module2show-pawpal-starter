@@ -94,14 +94,10 @@ Sample test output:
 
 ## 📐 Smarter Scheduling
 
-> Fill in once you've implemented scheduling logic.
-
-| Feature | Method(s) | Notes |
-|---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+- Sorting: Scheduler.sort_by_time() orders tasks chronologically by scheduled_time.
+- Filtering: Scheduler.filter_tasks(pet_id, completed) filters tasks by pet and/or completion status.
+- Conflict detection: Scheduler.detect_conflicts() flags same-pet overlaps and cross-pet owner double-booking.
+- Recurring tasks: Scheduler.complete_task() creates the next daily or weekly occurrence when a recurring task is completed.
 
 ## 📸 Demo Walkthrough
 

@@ -17,15 +17,92 @@ def main() -> None:
         Task("task2", pet1.pet_id, TaskType.FEEDING, today + timedelta(hours=1), duration_minutes=15, priority=4),
         Task("task3", pet2.pet_id, TaskType.MEDICATION, today + timedelta(hours=2), duration_minutes=20, priority=3),
         Task("task4", pet2.pet_id, TaskType.APPOINTMENT, today + timedelta(hours=3), duration_minutes=45, priority=2),
+        Task("task5", pet1.pet_id, TaskType.MEDICATION, today + timedelta(hours=4), duration_minutes=10, priority=2),
+        Task("task6", pet2.pet_id, TaskType.WALK, today + timedelta(hours=0, minutes=30), duration_minutes=25, priority=1),
     ]
 
     scheduler = Scheduler()
     for task in tasks:
         scheduler.add_task(task)
 
-    print("Today's Schedule")
+    recurring_task = Task(
+        "task7",
+        pet1.pet_id,
+        TaskType.FEEDING,
+        today + timedelta(hours=2),
+        duration_minutes=10,
+        priority=4,
+        is_recurring=True,
+        recurrence_pattern="daily",
+    )
+    scheduler.add_task(recurring_task)
+
+    print("Task List Before Completion")
     print("=" * 40)
     for task in scheduler.sort_by_time():
+        pet = owner.get_pet(task.pet_id)
+        pet_name = pet.name if pet else task.pet_id
+        print(
+            f"- {pet_name}: {task.task_type.value.title()} | "
+            f"{task.scheduled_time.strftime('%H:%M')} | "
+            f"{task.duration_minutes} min | priority {task.priority}"
+        )
+
+    new_task = scheduler.complete_task(recurring_task.task_id)
+    print("\nTask List After Completion")
+    print("=" * 40)
+    for task in scheduler.sort_by_time():
+        pet = owner.get_pet(task.pet_id)
+        pet_name = pet.name if pet else task.pet_id
+        print(
+            f"- {pet_name}: {task.task_type.value.title()} | "
+            f"{task.scheduled_time.strftime('%H:%M')} | "
+            f"{task.duration_minutes} min | priority {task.priority}"
+        )
+
+    print("\nCompleted Recurring Task")
+    print("=" * 40)
+    if new_task is not None:
+        print(f"- New task added: {new_task.task_id} at {new_task.scheduled_time.strftime('%H:%M')}")
+    else:
+        print("- No new task created.")
+
+    print("\nToday's Schedule")
+    print("=" * 40)
+    for task in scheduler.sort_by_time():
+        pet = owner.get_pet(task.pet_id)
+        pet_name = pet.name if pet else task.pet_id
+        print(
+            f"- {pet_name}: {task.task_type.value.title()} | "
+            f"{task.scheduled_time.strftime('%H:%M')} | "
+            f"{task.duration_minutes} min | priority {task.priority}"
+        )
+
+    print("\nSorted Tasks")
+    print("=" * 40)
+    for task in scheduler.sort_by_time():
+        pet = owner.get_pet(task.pet_id)
+        pet_name = pet.name if pet else task.pet_id
+        print(
+            f"- {pet_name}: {task.task_type.value.title()} | "
+            f"{task.scheduled_time.strftime('%H:%M')} | "
+            f"{task.duration_minutes} min | priority {task.priority}"
+        )
+
+    print("\nIncomplete Tasks")
+    print("=" * 40)
+    for task in scheduler.filter_tasks(completed=False):
+        pet = owner.get_pet(task.pet_id)
+        pet_name = pet.name if pet else task.pet_id
+        print(
+            f"- {pet_name}: {task.task_type.value.title()} | "
+            f"{task.scheduled_time.strftime('%H:%M')} | "
+            f"{task.duration_minutes} min | priority {task.priority}"
+        )
+
+    print("\nTasks for One Pet")
+    print("=" * 40)
+    for task in scheduler.filter_tasks(pet_id=pet1.pet_id):
         pet = owner.get_pet(task.pet_id)
         pet_name = pet.name if pet else task.pet_id
         print(
