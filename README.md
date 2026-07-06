@@ -84,7 +84,7 @@ Run the test suite with:
 python -m pytest
 ```
 
-The suite covers core class behavior for owners, pets, tasks, and the scheduler, along with sorting, filtering, recurring-task behavior, same-pet and cross-pet conflict detection, and key edge cases such as empty task lists and completion of non-recurring tasks.
+The current suite covers core class behavior such as task completion and pet/task management, chronological sorting, filtering by pet, by completion status, and by both conditions together, recurring task completion for daily and weekly intervals plus unsupported patterns correctly creating nothing, and conflict detection for same-pet overlaps, cross-pet double-booking, exact-duplicate-time cases, and adjacent non-overlapping tasks that are correctly not flagged.
 
 ## 📐 Smarter Scheduling
 

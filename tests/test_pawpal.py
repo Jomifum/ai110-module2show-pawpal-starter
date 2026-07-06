@@ -295,3 +295,176 @@ def test_non_recurring_task_completion_creates_nothing():
     # Assert
     assert next_task is None
     assert task.completed is True
+
+
+def test_filter_tasks_by_completed_status():
+    # Arrange
+    scheduler = Scheduler()
+    pet = Pet(pet_id="pet-1", name="Mochi", species="dog", owner_id="owner-1")
+    incomplete_task = Task(
+        task_id="task-1",
+        pet_id=pet.pet_id,
+        task_type=TaskType.WALK,
+        scheduled_time=datetime(2026, 7, 5, 8, 0),
+    )
+    completed_task = Task(
+        task_id="task-2",
+        pet_id=pet.pet_id,
+        task_type=TaskType.FEEDING,
+        scheduled_time=datetime(2026, 7, 5, 9, 0),
+    )
+    scheduler.add_task(incomplete_task)
+    scheduler.add_task(completed_task)
+    completed_task.mark_complete()
+
+    # Act
+    incomplete_results = scheduler.filter_tasks(completed=False)
+    completed_results = scheduler.filter_tasks(completed=True)
+
+    # Assert
+    assert incomplete_results == [incomplete_task]
+    assert completed_results == [completed_task]
+
+
+def test_filter_tasks_by_pet_id():
+    # Arrange
+    scheduler = Scheduler()
+    pet_a = Pet(pet_id="pet-a", name="Mochi", species="dog", owner_id="owner-1")
+    pet_b = Pet(pet_id="pet-b", name="Luna", species="cat", owner_id="owner-1")
+    task_a = Task(
+        task_id="task-1",
+        pet_id=pet_a.pet_id,
+        task_type=TaskType.WALK,
+        scheduled_time=datetime(2026, 7, 5, 8, 0),
+    )
+    task_b = Task(
+        task_id="task-2",
+        pet_id=pet_b.pet_id,
+        task_type=TaskType.FEEDING,
+        scheduled_time=datetime(2026, 7, 5, 9, 0),
+    )
+    scheduler.add_task(task_a)
+    scheduler.add_task(task_b)
+
+    # Act
+    filtered_tasks = scheduler.filter_tasks(pet_id=pet_a.pet_id)
+
+    # Assert
+    assert filtered_tasks == [task_a]
+
+
+def test_filter_tasks_combined_filters():
+    # Arrange
+    scheduler = Scheduler()
+    pet = Pet(pet_id="pet-1", name="Mochi", species="dog", owner_id="owner-1")
+    incomplete_task = Task(
+        task_id="task-1",
+        pet_id=pet.pet_id,
+        task_type=TaskType.WALK,
+        scheduled_time=datetime(2026, 7, 5, 8, 0),
+    )
+    completed_task = Task(
+        task_id="task-2",
+        pet_id=pet.pet_id,
+        task_type=TaskType.FEEDING,
+        scheduled_time=datetime(2026, 7, 5, 9, 0),
+    )
+    scheduler.add_task(incomplete_task)
+    scheduler.add_task(completed_task)
+    completed_task.mark_complete()
+
+    # Act
+    filtered_tasks = scheduler.filter_tasks(pet_id=pet.pet_id, completed=False)
+
+    # Assert
+    assert filtered_tasks == [incomplete_task]
+
+
+def test_unsupported_recurrence_pattern_creates_nothing():
+    # Arrange
+    scheduler = Scheduler()
+    task = Task(
+        task_id="task-monthly",
+        pet_id="pet-1",
+        task_type=TaskType.WALK,
+        scheduled_time=datetime(2026, 7, 5, 8, 0),
+        is_recurring=True,
+        recurrence_pattern="monthly",
+    )
+    scheduler.add_task(task)
+
+    # Act
+    next_task = scheduler.complete_task(task.task_id)
+
+    # Assert
+    assert next_task is None
+    assert len(scheduler.tasks) == 1
+    assert task.completed is True
+
+
+def test_adjacent_tasks_not_flagged_as_conflict():
+    # Arrange
+    scheduler = Scheduler()
+    first_task = Task(
+        task_id="task-1",
+        pet_id="pet-1",
+        task_type=TaskType.WALK,
+        scheduled_time=datetime(2026, 7, 5, 9, 0),
+        duration_minutes=30,
+    )
+    second_task = Task(
+        task_id="task-2",
+        pet_id="pet-1",
+        task_type=TaskType.FEEDING,
+        scheduled_time=datetime(2026, 7, 5, 9, 30),
+        duration_minutes=15,
+    )
+    scheduler.add_task(first_task)
+    scheduler.add_task(second_task)
+
+    # Act
+    conflicts = scheduler.detect_conflicts()
+
+    # Assert
+    assert (first_task, second_task, "same_pet") not in conflicts
+
+
+def test_generate_daily_plan_respects_budget_and_maximizes_priority():
+    # Arrange
+    scheduler = Scheduler()
+    pet_id = "pet-1"
+    today = datetime(2026, 7, 5, 8, 0)
+    short_task = Task(
+        task_id="task-1",
+        pet_id=pet_id,
+        task_type=TaskType.FEEDING,
+        scheduled_time=today,
+        duration_minutes=15,
+        priority=4,
+    )
+    medium_task = Task(
+        task_id="task-2",
+        pet_id=pet_id,
+        task_type=TaskType.WALK,
+        scheduled_time=today,
+        duration_minutes=30,
+        priority=5,
+    )
+    long_task = Task(
+        task_id="task-3",
+        pet_id=pet_id,
+        task_type=TaskType.MEDICATION,
+        scheduled_time=today,
+        duration_minutes=45,
+        priority=2,
+    )
+    scheduler.add_task(short_task)
+    scheduler.add_task(medium_task)
+    scheduler.add_task(long_task)
+
+    # Act
+    plan = scheduler.generate_daily_plan(pet_ids=[pet_id], available_minutes=50, reference_date=today)
+
+    # Assert
+    assert plan == [short_task, medium_task]
+    assert long_task not in plan
