@@ -78,19 +78,13 @@ No conflicts found.
 
 ## 🧪 Testing PawPal+
 
+Run the test suite with:
+
 ```bash
-# Run the full test suite:
-pytest
-
-# Run with coverage:
-pytest --cov
+python -m pytest
 ```
 
-Sample test output:
-
-```
-# Paste your pytest output here
-```
+The suite covers core class behavior for owners, pets, tasks, and the scheduler, along with sorting, filtering, recurring-task behavior, same-pet and cross-pet conflict detection, and key edge cases such as empty task lists and completion of non-recurring tasks.
 
 ## 📐 Smarter Scheduling
 
