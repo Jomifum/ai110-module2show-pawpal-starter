@@ -131,7 +131,23 @@ if st.session_state.owner is not None:
 
     if st.session_state.owner is not None and st.session_state.owner.pets:
         st.subheader("Today's Schedule")
-        sorted_tasks = st.session_state.scheduler.sort_by_time()
+
+        pet_filter_options = ["All pets"] + [pet.name for pet in st.session_state.owner.pets]
+        selected_pet_name = st.selectbox("Filter by pet", options=pet_filter_options)
+        show_incomplete_only = st.checkbox("Show incomplete tasks only", value=True)
+
+        selected_pet_id = None
+        if selected_pet_name != "All pets":
+            selected_pet_id = next(
+                pet.pet_id for pet in st.session_state.owner.pets if pet.name == selected_pet_name
+            )
+
+        filtered_tasks = st.session_state.scheduler.filter_tasks(
+            pet_id=selected_pet_id,
+            completed=False if show_incomplete_only else None,
+        )
+        sorted_tasks = sorted(filtered_tasks, key=lambda task: task.scheduled_time)
+
         if sorted_tasks:
             schedule_rows = []
             for task in sorted_tasks:
@@ -175,8 +191,23 @@ if st.session_state.owner is not None:
         conflicts = st.session_state.scheduler.detect_conflicts()
         if conflicts:
             st.warning("Conflicts detected:")
-            for first, second in conflicts:
-                st.warning(f"- {first.task_id} and {second.task_id} overlap")
+            for first, second, conflict_type in conflicts:
+                if conflict_type == "same_pet":
+                    pet = st.session_state.owner.get_pet(first.pet_id)
+                    pet_name = pet.name if pet else first.pet_id
+                    st.warning(
+                        f"⚠️ {pet_name} has overlapping tasks at {first.scheduled_time.strftime('%H:%M')}: "
+                        f"{first.task_type.value} and {second.task_type.value}"
+                    )
+                elif conflict_type == "owner_double_booked":
+                    first_pet = st.session_state.owner.get_pet(first.pet_id)
+                    second_pet = st.session_state.owner.get_pet(second.pet_id)
+                    first_pet_name = first_pet.name if first_pet else first.pet_id
+                    second_pet_name = second_pet.name if second_pet else second.pet_id
+                    st.warning(
+                        f"⚠️ You're double-booked at {first.scheduled_time.strftime('%H:%M')}: "
+                        f"{first.task_type.value} for {first_pet_name} and {second.task_type.value} for {second_pet_name}"
+                    )
 
 st.divider()
 

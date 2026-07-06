@@ -2,6 +2,13 @@ from datetime import datetime, timedelta
 
 from pawpal_system import Owner, Pet, Scheduler, Task, TaskType
 
+TASK_TYPE_EMOJIS = {
+    TaskType.FEEDING: "🍽️",
+    TaskType.WALK: "🐾",
+    TaskType.MEDICATION: "💊",
+    TaskType.APPOINTMENT: "🏥",
+}
+
 
 def main() -> None:
     owner = Owner(owner_id="owner1", name="Jordan", email="jordan@example.com", available_minutes_per_day=90)
@@ -43,7 +50,7 @@ def main() -> None:
         pet = owner.get_pet(task.pet_id)
         pet_name = pet.name if pet else task.pet_id
         print(
-            f"- {pet_name}: {task.task_type.value.title()} | "
+            f"- {TASK_TYPE_EMOJIS[task.task_type]} {pet_name}: {task.task_type.value.title()} | "
             f"{task.scheduled_time.strftime('%H:%M')} | "
             f"{task.duration_minutes} min | priority {task.priority}"
         )
@@ -55,7 +62,7 @@ def main() -> None:
         pet = owner.get_pet(task.pet_id)
         pet_name = pet.name if pet else task.pet_id
         print(
-            f"- {pet_name}: {task.task_type.value.title()} | "
+            f"- {TASK_TYPE_EMOJIS[task.task_type]} {pet_name}: {task.task_type.value.title()} | "
             f"{task.scheduled_time.strftime('%H:%M')} | "
             f"{task.duration_minutes} min | priority {task.priority}"
         )
@@ -73,7 +80,7 @@ def main() -> None:
         pet = owner.get_pet(task.pet_id)
         pet_name = pet.name if pet else task.pet_id
         print(
-            f"- {pet_name}: {task.task_type.value.title()} | "
+            f"- {TASK_TYPE_EMOJIS[task.task_type]} {pet_name}: {task.task_type.value.title()} | "
             f"{task.scheduled_time.strftime('%H:%M')} | "
             f"{task.duration_minutes} min | priority {task.priority}"
         )
@@ -84,7 +91,7 @@ def main() -> None:
         pet = owner.get_pet(task.pet_id)
         pet_name = pet.name if pet else task.pet_id
         print(
-            f"- {pet_name}: {task.task_type.value.title()} | "
+            f"- {TASK_TYPE_EMOJIS[task.task_type]} {pet_name}: {task.task_type.value.title()} | "
             f"{task.scheduled_time.strftime('%H:%M')} | "
             f"{task.duration_minutes} min | priority {task.priority}"
         )
@@ -95,7 +102,7 @@ def main() -> None:
         pet = owner.get_pet(task.pet_id)
         pet_name = pet.name if pet else task.pet_id
         print(
-            f"- {pet_name}: {task.task_type.value.title()} | "
+            f"- {TASK_TYPE_EMOJIS[task.task_type]} {pet_name}: {task.task_type.value.title()} | "
             f"{task.scheduled_time.strftime('%H:%M')} | "
             f"{task.duration_minutes} min | priority {task.priority}"
         )
@@ -106,7 +113,7 @@ def main() -> None:
         pet = owner.get_pet(task.pet_id)
         pet_name = pet.name if pet else task.pet_id
         print(
-            f"- {pet_name}: {task.task_type.value.title()} | "
+            f"- {TASK_TYPE_EMOJIS[task.task_type]} {pet_name}: {task.task_type.value.title()} | "
             f"{task.scheduled_time.strftime('%H:%M')} | "
             f"{task.duration_minutes} min | priority {task.priority}"
         )
@@ -121,7 +128,7 @@ def main() -> None:
         pet = owner.get_pet(task.pet_id)
         pet_name = pet.name if pet else task.pet_id
         print(
-            f"- {pet_name}: {task.task_type.value.title()} | "
+            f"- {TASK_TYPE_EMOJIS[task.task_type]} {pet_name}: {task.task_type.value.title()} | "
             f"{task.scheduled_time.strftime('%H:%M')} | "
             f"{task.duration_minutes} min | priority {task.priority}"
         )
@@ -130,10 +137,18 @@ def main() -> None:
     print("=" * 40)
     conflicts = scheduler.detect_conflicts()
     if conflicts:
-        for first, second in conflicts:
+        for first, second, _ in conflicts:
             print(f"- {first.task_id} and {second.task_id} overlap")
     else:
         print("No conflicts found.")
+
+    print("\nNext Available Slot")
+    print("=" * 40)
+    next_slot = scheduler.find_next_available_slot(pet_id=pet1.pet_id, duration_minutes=20, after=today)
+    if next_slot is not None:
+        print(f"- Earliest open slot: {next_slot.strftime('%H:%M')}")
+    else:
+        print("- No open slot found.")
 
 
 if __name__ == "__main__":

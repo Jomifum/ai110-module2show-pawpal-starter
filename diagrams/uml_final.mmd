@@ -8,7 +8,7 @@ classDiagram
         +List~Pet~ pets
         +add_pet(pet: Pet) None
         +remove_pet(pet_id: str) bool
-        +get_pet(pet_id: str) Pet
+        +get_pet(pet_id: str) Optional~Pet~
     }
 
     class Pet {
@@ -30,11 +30,11 @@ classDiagram
         +int duration_minutes
         +int priority
         +bool is_recurring
-        +str recurrence_pattern
+        +Optional~str~ recurrence_pattern
         +bool completed
         +str notes
         +mark_complete() None
-        +is_overdue(reference_time) bool
+        +is_overdue(reference_time: Optional~datetime~) bool
     }
     note for Task "priority is 1 (low) to 5 (critical)"
 
@@ -51,15 +51,17 @@ classDiagram
         +add_task(task: Task) None
         +remove_task(task_id: str) bool
         +get_tasks_for_pet(pet_id: str) List~Task~
-        +get_today_tasks(reference_date) List~Task~
+        +get_today_tasks(reference_date: Optional~datetime~) List~Task~
+        +filter_tasks(pet_id: Optional~str~, completed: Optional~bool~) List~Task~
         +sort_by_time() List~Task~
-        +detect_conflicts() List~tuple~
-        +get_overdue_tasks(reference_time) List~Task~
-        +generate_daily_plan(pet_ids, available_minutes, reference_date) List~Task~
-        +generate_recurring_instances(task, horizon_days) List~Task~
+        +detect_conflicts() List~Tuple~Task, Task, str~~
+        +get_overdue_tasks(reference_time: Optional~datetime~) List~Task~
+        +generate_daily_plan(pet_ids: Optional~List~str~~, available_minutes: int, reference_date: Optional~datetime~) List~Task~
+        +complete_task(task_id: str) Optional~Task~
+        +generate_recurring_instances(task: Task, horizon_days: int) List~Task~
     }
 
     Owner "1" --> "0..*" Pet : owns
-    Pet "1" --> "0..*" Task : has
+    Pet "1" --> "0..*" Task : has tasks
     Scheduler "1" --> "0..*" Task : manages
     Task ..> TaskType : uses

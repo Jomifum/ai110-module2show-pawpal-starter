@@ -468,3 +468,23 @@ def test_generate_daily_plan_respects_budget_and_maximizes_priority():
     # Assert
     assert plan == [short_task, medium_task]
     assert long_task not in plan
+
+
+def test_find_next_available_slot_skips_overlapping_tasks():
+    # Arrange
+    scheduler = Scheduler()
+    pet_id = "pet-1"
+    existing_task = Task(
+        task_id="task-1",
+        pet_id=pet_id,
+        task_type=TaskType.WALK,
+        scheduled_time=datetime(2026, 7, 5, 9, 0),
+        duration_minutes=30,
+    )
+    scheduler.add_task(existing_task)
+
+    # Act
+    next_slot = scheduler.find_next_available_slot(pet_id=pet_id, duration_minutes=20, after=datetime(2026, 7, 5, 9, 0))
+
+    # Assert
+    assert next_slot == datetime(2026, 7, 5, 9, 30)

@@ -135,6 +135,10 @@ class Scheduler:
         """Return all tasks sorted chronologically by scheduled_time."""
         return sorted(self.tasks, key=lambda task: task.scheduled_time)
 
+    def _time_ranges_overlap(self, start_a: datetime, end_a: datetime, start_b: datetime, end_b: datetime) -> bool:
+        """Return True when two time ranges overlap."""
+        return start_a < end_b and start_b < end_a
+
     def detect_conflicts(self) -> List[Tuple[Task, Task, str]]:
         """Return overlapping task pairs with a conflict type label."""
         conflicts: List[Tuple[Task, Task, str]] = []
@@ -143,12 +147,44 @@ class Scheduler:
                 first_end = first_task.scheduled_time + timedelta(minutes=first_task.duration_minutes)
                 second_end = second_task.scheduled_time + timedelta(minutes=second_task.duration_minutes)
 
-                if first_task.scheduled_time < second_end and second_task.scheduled_time < first_end:
+                if self._time_ranges_overlap(
+                    first_task.scheduled_time,
+                    first_end,
+                    second_task.scheduled_time,
+                    second_end,
+                ):
                     if first_task.pet_id == second_task.pet_id:
                         conflicts.append((first_task, second_task, "same_pet"))
                     else:
                         conflicts.append((first_task, second_task, "owner_double_booked"))
         return conflicts
+
+    def find_next_available_slot(
+        self,
+        pet_id: str,
+        duration_minutes: int,
+        after: Optional[datetime] = None,
+    ) -> Optional[datetime]:
+        """Return the earliest open time slot for a pet that fits the requested duration."""
+        if duration_minutes <= 0:
+            return None
+
+        if after is None:
+            after = datetime.now()
+
+        pet_tasks = [task for task in self.tasks if task.pet_id == pet_id]
+        candidate_time = after
+        while True:
+            overlaps = False
+            candidate_end = candidate_time + timedelta(minutes=duration_minutes)
+            for task in pet_tasks:
+                task_end = task.scheduled_time + timedelta(minutes=task.duration_minutes)
+                if self._time_ranges_overlap(candidate_time, candidate_end, task.scheduled_time, task_end):
+                    overlaps = True
+                    candidate_time = task_end
+                    break
+            if not overlaps:
+                return candidate_time
 
     def get_overdue_tasks(self, reference_time: Optional[datetime] = None) -> List[Task]:
         """Return tasks that are overdue (past scheduled_time) and not completed."""
