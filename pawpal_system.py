@@ -9,7 +9,7 @@ but method bodies are stubs (`pass`) to be implemented in later phases.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import List, Optional, Tuple
 
@@ -51,11 +51,13 @@ class Task:
 
     def mark_complete(self) -> None:
         """Mark this task as completed."""
-        pass
+        self.completed = True
 
     def is_overdue(self, reference_time: Optional[datetime] = None) -> bool:
         """Return True if scheduled_time has passed and the task isn't completed."""
-        pass
+        if reference_time is None:
+            reference_time = datetime.now()
+        return self.scheduled_time < reference_time and not self.completed
 
 
 @dataclass
@@ -70,15 +72,21 @@ class Owner:
 
     def add_pet(self, pet: Pet) -> None:
         """Add a pet to this owner's list of pets."""
-        pass
+        if not any(existing_pet.pet_id == pet.pet_id for existing_pet in self.pets):
+            self.pets.append(pet)
 
     def remove_pet(self, pet_id: str) -> bool:
         """Remove a pet by id. Returns True if a pet was removed."""
-        pass
+        original_length = len(self.pets)
+        self.pets = [existing_pet for existing_pet in self.pets if existing_pet.pet_id != pet_id]
+        return len(self.pets) < original_length
 
     def get_pet(self, pet_id: str) -> Optional[Pet]:
         """Return the pet with the given id, or None if not found."""
-        pass
+        for pet in self.pets:
+            if pet.pet_id == pet_id:
+                return pet
+        return None
 
 
 class Scheduler:
@@ -89,38 +97,53 @@ class Scheduler:
     """
 
     def __init__(self) -> None:
+        """Initialize an empty scheduler instance."""
         self.tasks: List[Task] = []
 
     def add_task(self, task: Task) -> None:
         """Add a new task to the schedule."""
-        pass
+        if not any(existing_task.task_id == task.task_id for existing_task in self.tasks):
+            self.tasks.append(task)
 
     def remove_task(self, task_id: str) -> bool:
         """Remove a task by id. Returns True if a task was removed."""
-        pass
+        original_length = len(self.tasks)
+        self.tasks = [existing_task for existing_task in self.tasks if existing_task.task_id != task_id]
+        return len(self.tasks) < original_length
 
     def get_tasks_for_pet(self, pet_id: str) -> List[Task]:
         """Return all tasks belonging to a specific pet."""
-        pass
+        return [task for task in self.tasks if task.pet_id == pet_id]
 
     def get_today_tasks(self, reference_date: Optional[datetime] = None) -> List[Task]:
         """Return all tasks scheduled for today (or the given reference date)."""
-        pass
+        if reference_date is None:
+            reference_date = datetime.now()
+        target_date = reference_date.date()
+        return [task for task in self.tasks if task.scheduled_time.date() == target_date]
 
     def sort_by_time(self) -> List[Task]:
         """Return all tasks sorted chronologically by scheduled_time."""
-        pass
+        return sorted(self.tasks, key=lambda task: task.scheduled_time)
 
     def detect_conflicts(self) -> List[Tuple[Task, Task]]:
-        """
-        Return pairs of tasks whose time windows overlap for the same pet
-        (e.g. a walk and a vet appointment scheduled at overlapping times).
-        """
-        pass
+        """Return overlapping task pairs for the same pet."""
+        conflicts: List[Tuple[Task, Task]] = []
+        for index, first_task in enumerate(self.tasks):
+            for second_task in self.tasks[index + 1 :]:
+                if first_task.pet_id != second_task.pet_id:
+                    continue
+
+                first_end = first_task.scheduled_time + timedelta(minutes=first_task.duration_minutes)
+                second_end = second_task.scheduled_time + timedelta(minutes=second_task.duration_minutes)
+
+                if first_task.scheduled_time < second_end and second_task.scheduled_time < first_end:
+                    conflicts.append((first_task, second_task))
+        return conflicts
 
     def get_overdue_tasks(self, reference_time: Optional[datetime] = None) -> List[Task]:
         """Return tasks that are overdue (past scheduled_time) and not completed."""
-        pass
+        return [task for task in self.tasks if task.is_overdue(reference_time)]
 
     def generate_daily_plan(
         self,
@@ -128,29 +151,70 @@ class Scheduler:
         available_minutes: int = 60,
         reference_date: Optional[datetime] = None,
     ) -> List[Task]:
-        """
-        Build an optimized daily plan: select and order tasks for the given
-        pets/date so their total duration_minutes fits within
-        available_minutes, prioritizing the highest-priority (1-5) tasks
-        first. This is a resource-constrained selection problem (0/1
-        knapsack: maximize total priority subject to total duration <=
-        available_minutes) rather than a simple sort — a naive
-        sort-by-priority can skip a cheap high-value task in favor of one
-        that doesn't fit.
+        """Build a daily plan that fits the available minutes while favoring higher-value tasks."""
+        if available_minutes <= 0:
+            return []
 
-        Implementation note for later phases: a priority/duration_minutes
-        density score will likely outperform raw priority as a greedy
-        heuristic; true optimality would need a DP knapsack solution if
-        task lists grow large enough to matter.
-        """
-        pass
+        if reference_date is None:
+            reference_date = datetime.now()
+        target_date = reference_date.date()
+
+        candidate_tasks = [
+            task
+            for task in self.tasks
+            if not task.completed
+            and task.scheduled_time.date() == target_date
+            and (pet_ids is None or task.pet_id in pet_ids)
+        ]
+
+        candidate_tasks = sorted(
+            candidate_tasks,
+            key=lambda task: (
+                -(task.priority / max(task.duration_minutes, 1)),
+                task.scheduled_time,
+                task.task_id,
+            ),
+        )
+
+        selected_tasks: List[Task] = []
+        total_duration = 0
+        for task in candidate_tasks:
+            if total_duration + task.duration_minutes <= available_minutes:
+                selected_tasks.append(task)
+                total_duration += task.duration_minutes
+
+        return selected_tasks
 
     def generate_recurring_instances(self, task: Task, horizon_days: int) -> List[Task]:
-        """
-        Given a recurring task, generate future Task instances up to
-        horizon_days ahead, based on its recurrence_pattern.
-        """
-        pass
+        """Generate future instances of a recurring task up to the given horizon."""
+        if horizon_days <= 0:
+            return []
+
+        pattern = task.recurrence_pattern
+        if pattern not in {"daily", "weekly"}:
+            return []
+
+        instances: List[Task] = []
+        step_days = 1 if pattern == "daily" else 7
+        current_offset = step_days
+        while current_offset <= horizon_days:
+            instances.append(
+                Task(
+                    task_id=f"{task.task_id}_{current_offset}",
+                    pet_id=task.pet_id,
+                    task_type=task.task_type,
+                    scheduled_time=task.scheduled_time + timedelta(days=current_offset),
+                    duration_minutes=task.duration_minutes,
+                    priority=task.priority,
+                    is_recurring=task.is_recurring,
+                    recurrence_pattern=task.recurrence_pattern,
+                    completed=False,
+                    notes=task.notes,
+                )
+            )
+            current_offset += step_days
+
+        return instances
 
 
 if __name__ == "__main__":
